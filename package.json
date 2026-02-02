@@ -1,0 +1,57 @@
+{
+  "name": "@chitty/documint",
+  "version": "1.0.0",
+  "description": "Mint it. It's permanent. Document signing with ChittyProof.",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "require": "./src/index.cjs"
+    },
+    "./sdk": {
+      "import": "./src/sdk/client.js"
+    },
+    "./verify": {
+      "import": "./src/verify/public.js"
+    }
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "esbuild src/index.js --bundle --outfile=dist/documint.js --format=esm",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "lint": "eslint src/",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production"
+  },
+  "keywords": [
+    "documint",
+    "chitty",
+    "chittyproof",
+    "esign",
+    "digital-signature",
+    "certified-delivery",
+    "court-admissible",
+    "document-verification"
+  ],
+  "author": "ChittyApps",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chittyapps/documint"
+  },
+  "homepage": "https://documint.chitty.cc",
+  "dependencies": {},
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "eslint": "^8.57.0",
+    "vitest": "^1.2.0",
+    "wrangler": "^3.24.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
