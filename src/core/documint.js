@@ -249,15 +249,19 @@ export class DocuMint {
 
   async hashDocument(document) {
     let data;
-    if (typeof document === 'string') {
-      // Assume base64
-      data = Uint8Array.from(atob(document), c => c.charCodeAt(0));
-    } else if (document instanceof Uint8Array) {
-      data = document;
-    } else if (Buffer && Buffer.isBuffer(document)) {
-      data = new Uint8Array(document);
-    } else {
-      throw new Error('Document must be Buffer, Uint8Array, or base64 string');
+    try {
+      if (typeof document === 'string') {
+        data = Uint8Array.from(atob(document), c => c.charCodeAt(0));
+      } else if (document instanceof Uint8Array) {
+        data = document;
+      } else if (typeof Buffer !== 'undefined' && Buffer.isBuffer(document)) {
+        data = new Uint8Array(document);
+      } else {
+        throw new Error('Document must be Buffer, Uint8Array, or base64 string');
+      }
+    } catch (error) {
+      if (error.message.includes('Document must be')) throw error;
+      throw new Error(`Invalid document format: ${error.message}`);
     }
 
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -268,27 +272,39 @@ export class DocuMint {
 
   getDocumentSize(document) {
     if (typeof document === 'string') {
-      return Math.ceil(document.length * 0.75); // base64 to bytes approx
+      return Math.ceil(document.length * 0.75);
     }
     return document.length || document.byteLength || 0;
   }
 
   generateMintId() {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 10);
-    return `DM-${timestamp}-${random}`.toUpperCase();
+    const bytes = new Uint8Array(8);
+    crypto.getRandomValues(bytes);
+    const random = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `DM-${Date.now().toString(36)}-${random}`.toUpperCase();
   }
 
   generateAttachmentId() {
-    return `DA-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    const random = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `DA-${Date.now().toString(36)}-${random}`.toUpperCase();
   }
 
   generateRevocationId() {
-    return `DR-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`.toUpperCase();
+    const bytes = new Uint8Array(6);
+    crypto.getRandomValues(bytes);
+    const random = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `DR-${Date.now().toString(36)}-${random}`.toUpperCase();
   }
 
   async validateApiKey() {
-    // TODO: Validate with ChittyOS
+    if (!this.apiKey) return false;
+    // API key is validated at the API layer against env.API_KEY
+    // This validates format only — real auth happens in the worker
+    if (typeof this.apiKey !== 'string' || this.apiKey.length < 16) {
+      throw new Error('Invalid API key format');
+    }
     return true;
   }
 }

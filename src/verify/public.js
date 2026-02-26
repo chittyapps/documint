@@ -1,43 +1,46 @@
 /**
  * Public Verification
  * Anyone can verify a ChittyProof without authentication.
- *
- * Usage:
- *   // Via URL
- *   https://chitty.cc/verify/DM-ABC123
- *
- *   // Via CLI
- *   npx @chitty/documint verify DM-ABC123
- *
- *   // Via code
- *   import { PublicVerify } from '@chitty/documint/verify';
- *   const result = await PublicVerify.verify('DM-ABC123');
  */
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export class PublicVerify {
   static baseUrl = 'https://api.chitty.cc/verify';
 
-  /**
-   * Verify a proof publicly (no auth required)
-   */
   static async verify(proofId) {
-    const url = `${this.baseUrl}/${proofId}`;
-
-    const response = await fetch(url);
+    let response;
+    try {
+      response = await fetch(`${this.baseUrl}/${encodeURIComponent(proofId)}`);
+    } catch (error) {
+      return {
+        proofId,
+        found: false,
+        verified: false,
+        error: `Network error: ${error.message}`
+      };
+    }
 
     if (!response.ok) {
       if (response.status === 404) {
-        return {
-          proofId,
-          found: false,
-          verified: false,
-          error: 'Proof not found'
-        };
+        return { proofId, found: false, verified: false, error: 'Proof not found' };
       }
-      throw new Error(`Verification failed: ${response.statusText}`);
+      return { proofId, found: false, verified: false, error: `Server error: ${response.status}` };
     }
 
-    const proof = await response.json();
+    let proof;
+    try {
+      proof = await response.json();
+    } catch {
+      return { proofId, found: false, verified: false, error: 'Invalid response from server' };
+    }
 
     return {
       proofId,
@@ -60,66 +63,48 @@ export class PublicVerify {
     };
   }
 
-  /**
-   * Verify a signature
-   */
   static async verifySignature(signatureId) {
-    const url = `${this.baseUrl}/sig/${signatureId}`;
-
-    const response = await fetch(url);
+    let response;
+    try {
+      response = await fetch(`${this.baseUrl}/sig/${encodeURIComponent(signatureId)}`);
+    } catch (error) {
+      return { signatureId, valid: false, error: `Network error: ${error.message}` };
+    }
 
     if (!response.ok) {
       return { signatureId, valid: false, error: 'Signature not found' };
     }
 
-    return response.json();
+    try {
+      return await response.json();
+    } catch {
+      return { signatureId, valid: false, error: 'Invalid response from server' };
+    }
   }
 
-  /**
-   * Get verification badge HTML
-   */
   static getBadge(proofId, options = {}) {
     const { size = 'medium', theme = 'light' } = options;
-
-    const sizes = {
-      small: { width: 120, height: 40 },
-      medium: { width: 200, height: 60 },
-      large: { width: 280, height: 80 }
-    };
-
+    const safeId = escapeHtml(proofId);
+    const safeTheme = escapeHtml(theme);
+    const sizes = { small: { width: 120, height: 40 }, medium: { width: 200, height: 60 }, large: { width: 280, height: 80 } };
     const { width, height } = sizes[size] || sizes.medium;
 
-    return `<a href="https://chitty.cc/verify/${proofId}" target="_blank" rel="noopener">
-  <img
-    src="https://chitty.cc/badge/${proofId}?theme=${theme}"
-    alt="Verified by ChittyProof"
-    width="${width}"
-    height="${height}"
-  />
-</a>`;
+    return `<a href="https://chitty.cc/verify/${safeId}" target="_blank" rel="noopener"><img src="https://chitty.cc/badge/${safeId}?theme=${safeTheme}" alt="Verified by ChittyProof" width="${Number(width)}" height="${Number(height)}" /></a>`;
   }
 
-  /**
-   * Get verification QR code URL
-   */
   static getQRCode(proofId, options = {}) {
     const { size = 200 } = options;
-    return `https://chitty.cc/qr/${proofId}?size=${size}`;
+    const safeId = encodeURIComponent(proofId);
+    return `https://chitty.cc/qr/${safeId}?size=${Number(size)}`;
   }
 
-  /**
-   * Generate embed code for verification widget
-   */
   static getEmbed(proofId, options = {}) {
     const { width = '100%', height = 400 } = options;
+    const safeId = escapeHtml(proofId);
+    const safeWidth = escapeHtml(String(width));
+    const safeHeight = Number(height);
 
-    return `<iframe
-  src="https://chitty.cc/embed/verify/${proofId}"
-  width="${width}"
-  height="${height}"
-  frameborder="0"
-  allowtransparency="true"
-></iframe>`;
+    return `<iframe src="https://chitty.cc/embed/verify/${safeId}" width="${safeWidth}" height="${safeHeight}" frameborder="0" allowtransparency="true"></iframe>`;
   }
 }
 

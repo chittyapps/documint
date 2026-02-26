@@ -22,6 +22,10 @@ export class DocuMintClient {
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl || 'https://api.chitty.cc/documint/v1';
     this.timeout = config.timeout || 30000;
+
+    if (!this.apiKey) {
+      throw new DocuMintError('API key required', 'AUTH_REQUIRED');
+    }
   }
 
   // ============ Document Lifecycle ============

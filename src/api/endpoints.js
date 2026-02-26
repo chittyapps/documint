@@ -4,13 +4,20 @@
  */
 
 import { DocuMint } from '../core/documint.js';
-import { PublicVerify } from '../verify/public.js';
+
+const ALLOWED_ORIGINS = [
+  'https://documint.chitty.cc',
+  'https://api.chitty.cc',
+  'https://portal.chitty.cc',
+  'https://chitty.cc'
+];
 
 export class DocuMintAPI {
   constructor(env) {
     this.env = env;
     this.documint = new DocuMint({
-      apiKey: env.INTERNAL_API_KEY
+      apiKey: env.INTERNAL_API_KEY,
+      chittyId: env.CHITTY_ID
     });
   }
 
@@ -19,21 +26,16 @@ export class DocuMintAPI {
     return this;
   }
 
-  /**
-   * Handle incoming requests
-   */
   async handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
 
-    // CORS
     if (method === 'OPTIONS') {
-      return this.corsResponse();
+      return this.corsResponse(request);
     }
 
     try {
-      // Route requests
       if (path.startsWith('/documint/v1/mint')) {
         return await this.handleMintRoutes(request, path, method);
       }
@@ -47,106 +49,106 @@ export class DocuMintAPI {
       }
 
       return this.notFound();
-
     } catch (error) {
-      console.error('DocuMint API error:', error);
-      return this.errorResponse(error.message, 500);
+      console.error('DocuMint API error:', error.message, error.stack);
+      return this.errorResponse('Internal server error', 500);
     }
   }
 
   // ============ Mint Routes ============
 
   async handleMintRoutes(request, path, method) {
-    // POST /documint/v1/mint - Create new mint
     if (path === '/documint/v1/mint' && method === 'POST') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
 
-      const body = await request.json();
-      const result = await this.documint.mint(body);
-      return this.jsonResponse(result, 201);
+      const body = await this.parseJSON(request);
+      if (body.error) return body.error;
+
+      if (!body.data.document) return this.errorResponse('Missing required field: document', 400);
+      if (!body.data.name || typeof body.data.name !== 'string') return this.errorResponse('Missing required field: name', 400);
+
+      const result = await this.documint.mint({ ...body.data, chittyId: auth.chittyId });
+      return this.jsonResponse(result, 201, request);
     }
 
-    // Extract mintId from path
     const mintIdMatch = path.match(/\/documint\/v1\/mint\/([^/]+)/);
     if (!mintIdMatch) return this.notFound();
 
     const mintId = mintIdMatch[1];
+    if (!/^DM-/.test(mintId)) return this.errorResponse('Invalid mint ID format', 400);
+
     const subPath = path.replace(`/documint/v1/mint/${mintId}`, '');
 
-    // POST /documint/v1/mint/:id/sign
     if (subPath === '/sign' && method === 'POST') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
 
-      const body = await request.json();
-      const result = await this.documint.sign(mintId, body);
-      return this.jsonResponse(result);
+      const body = await this.parseJSON(request);
+      if (body.error) return body.error;
+
+      if (!body.data.signer || typeof body.data.signer !== 'string') return this.errorResponse('Missing required field: signer', 400);
+
+      const result = await this.documint.sign(mintId, { ...body.data, chittyId: auth.chittyId });
+      return this.jsonResponse(result, 200, request);
     }
 
-    // POST /documint/v1/mint/:id/attach
     if (subPath === '/attach' && method === 'POST') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
 
-      const body = await request.json();
-      const result = await this.documint.attach(mintId, body);
-      return this.jsonResponse(result);
+      const body = await this.parseJSON(request);
+      if (body.error) return body.error;
+
+      if (!body.data.attachmentMintId) return this.errorResponse('Missing required field: attachmentMintId', 400);
+      if (!body.data.relationship) return this.errorResponse('Missing required field: relationship', 400);
+
+      const result = await this.documint.attach(mintId, body.data);
+      return this.jsonResponse(result, 200, request);
     }
 
-    // POST /documint/v1/mint/:id/revoke
     if (subPath === '/revoke' && method === 'POST') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
 
-      const body = await request.json();
-      const result = await this.documint.revoke(mintId, body);
-      return this.jsonResponse(result);
+      const body = await this.parseJSON(request);
+      if (body.error) return body.error;
+
+      if (!body.data.reason) return this.errorResponse('Missing required field: reason', 400);
+      if (!body.data.revokedBy) return this.errorResponse('Missing required field: revokedBy', 400);
+
+      const result = await this.documint.revoke(mintId, body.data);
+      return this.jsonResponse(result, 200, request);
     }
 
-    // GET /documint/v1/mint/:id
     if (subPath === '' && method === 'GET') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
-
-      const result = await this.documint.verify(mintId);
-      return this.jsonResponse(result);
+      return this.jsonResponse(await this.documint.verify(mintId), 200, request);
     }
 
-    // GET /documint/v1/mint/:id/bundle
     if (subPath === '/bundle' && method === 'GET') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
-
-      const result = await this.documint.bundle(mintId);
-      return this.jsonResponse(result);
+      return this.jsonResponse(await this.documint.bundle(mintId), 200, request);
     }
 
-    // GET /documint/v1/mint/:id/export
     if (subPath === '/export' && method === 'GET') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
-
-      const result = await this.documint.export(mintId);
-      return this.jsonResponse(result);
+      return this.jsonResponse(await this.documint.export(mintId), 200, request);
     }
 
-    // GET /documint/v1/mint/:id/audit
     if (subPath === '/audit' && method === 'GET') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
-
-      const result = await this.documint.chain.history(mintId);
-      return this.jsonResponse(result);
+      return this.jsonResponse(await this.documint.chain.history(mintId), 200, request);
     }
 
-    // GET /documint/v1/mint/:id/report
     if (subPath === '/report' && method === 'GET') {
       const auth = await this.authenticate(request);
       if (!auth.valid) return this.unauthorized();
-
-      const result = await this.documint.proof.generateReport(mintId);
-      return this.jsonResponse(result);
+      return this.jsonResponse(await this.documint.proof.generateReport(mintId), 200, request);
     }
 
     return this.notFound();
@@ -157,20 +159,17 @@ export class DocuMintAPI {
   async handleVerifyRoutes(request, path, method) {
     if (method !== 'GET') return this.methodNotAllowed();
 
-    // Extract proof ID
     const proofIdMatch = path.match(/\/(?:documint\/v1\/)?verify\/([^/]+)/);
     if (!proofIdMatch) return this.notFound();
 
     const proofId = proofIdMatch[1];
-
-    // Public verification - no auth needed
     const result = await this.documint.verify(proofId);
 
     return this.jsonResponse({
       ...result,
       publicVerification: true,
       verifiedAt: new Date().toISOString()
-    });
+    }, 200, request);
   }
 
   // ============ Audit Routes ============
@@ -178,18 +177,22 @@ export class DocuMintAPI {
   async handleAuditRoutes(request, path, method) {
     if (method !== 'POST') return this.methodNotAllowed();
 
-    // POST /documint/v1/audit/score
+    const auth = await this.authenticate(request);
+    if (!auth.valid) return this.unauthorized();
+
+    const body = await this.parseJSON(request);
+    if (body.error) return body.error;
+
     if (path === '/documint/v1/audit/score') {
-      const body = await request.json();
-      const result = await this.scoreDocument(body);
-      return this.jsonResponse(result);
+      if (!body.data.features) return this.errorResponse('Missing required field: features', 400);
+      const result = await this.scoreDocument(body.data);
+      return this.jsonResponse(result, 200, request);
     }
 
-    // POST /documint/v1/audit/compare
     if (path === '/documint/v1/audit/compare') {
-      const body = await request.json();
-      const result = await this.compareToChittyProof(body);
-      return this.jsonResponse(result);
+      if (!body.data.features) return this.errorResponse('Missing required field: features', 400);
+      const result = await this.compareToChittyProof(body.data);
+      return this.jsonResponse(result, 200, request);
     }
 
     return this.notFound();
@@ -198,9 +201,7 @@ export class DocuMintAPI {
   // ============ Audit Engine ============
 
   async scoreDocument(options) {
-    // Score any document/system against 11 pillars
     const { system, features } = options;
-
     const scores = this.calculatePillarScores(features);
     const overall = this.calculateOverallScore(scores);
 
@@ -215,7 +216,12 @@ export class DocuMintAPI {
   }
 
   calculatePillarScores(features) {
-    // Default scores based on features
+    if (!features || typeof features !== 'object') {
+      return Object.fromEntries(
+        ['signature', 'identity', 'document', 'delivery', 'authority', 'witness', 'durability', 'chain', 'verifiable', 'revocable', 'caseReady']
+          .map(p => [p, { score: 0, technical: 0, arguable: 0 }])
+      );
+    }
     return {
       signature: this.scorePillar('signature', features),
       identity: this.scorePillar('identity', features),
@@ -232,27 +238,37 @@ export class DocuMintAPI {
   }
 
   scorePillar(pillar, features) {
-    // Simplified scoring logic - expand based on actual features
-    const featureMap = {
-      signature: ['cryptoSignature', 'typedName', 'drawnSignature', 'checkbox'],
-      identity: ['chittyId', 'govId', 'email2fa', 'emailOnly'],
-      document: ['immutableHash', 'hash', 'noHash'],
-      delivery: ['certifiedDelivery', 'readReceipt', 'emailOnly'],
-      authority: ['roleVerified', 'titleStated', 'assumed'],
-      witness: ['thirdParty', 'vendorOnly', 'none'],
-      durability: ['distributed', 'cloudSingle', 'local'],
-      chain: ['fullChain', 'partialChain', 'noChain'],
-      verifiable: ['publicVerify', 'vendorVerify', 'noVerify'],
-      revocable: ['revocableAudit', 'deletable', 'permanent'],
-      caseReady: ['fullBundle', 'partialBundle', 'none']
+    // Real scoring: each pillar has ranked features from strongest to weakest
+    const featureRanks = {
+      signature:  [['cryptoSignature', 95, 95, 90], ['drawnSignature', 60, 55, 65], ['typedName', 30, 25, 35], ['checkbox', 10, 5, 15]],
+      identity:   [['chittyId', 90, 90, 85], ['govId', 85, 80, 90], ['email2fa', 60, 65, 55], ['emailOnly', 30, 35, 25]],
+      document:   [['immutableHash', 95, 95, 90], ['hash', 70, 75, 65], ['noHash', 5, 5, 5]],
+      delivery:   [['certifiedDelivery', 90, 85, 90], ['readReceipt', 50, 55, 45], ['emailOnly', 20, 25, 15]],
+      authority:  [['roleVerified', 85, 80, 85], ['titleStated', 40, 35, 45], ['assumed', 10, 5, 15]],
+      witness:    [['thirdParty', 90, 85, 90], ['vendorOnly', 50, 55, 45], ['none', 0, 0, 0]],
+      durability: [['distributed', 95, 95, 90], ['cloudSingle', 60, 65, 55], ['local', 20, 25, 15]],
+      chain:      [['fullChain', 90, 90, 85], ['partialChain', 50, 55, 45], ['noChain', 0, 0, 0]],
+      verifiable: [['publicVerify', 95, 95, 90], ['vendorVerify', 50, 55, 45], ['noVerify', 0, 0, 0]],
+      revocable:  [['revocableAudit', 95, 95, 90], ['deletable', 30, 35, 25], ['permanent', 60, 55, 65]],
+      caseReady:  [['fullBundle', 90, 85, 90], ['partialBundle', 50, 45, 55], ['none', 0, 0, 0]]
     };
 
-    // Return mock score - implement real logic
-    return {
-      score: 50,
-      technical: 50,
-      arguable: 50
-    };
+    const ranks = featureRanks[pillar] || [];
+    const pillarFeatures = Array.isArray(features[pillar]) ? features[pillar] : (features[pillar] ? [features[pillar]] : []);
+
+    // Find the strongest matching feature
+    let bestScore = 0, bestTechnical = 0, bestArguable = 0;
+    for (const [featureName, score, technical, arguable] of ranks) {
+      if (pillarFeatures.includes(featureName)) {
+        if (score > bestScore) {
+          bestScore = score;
+          bestTechnical = technical;
+          bestArguable = arguable;
+        }
+      }
+    }
+
+    return { score: bestScore, technical: bestTechnical, arguable: bestArguable };
   }
 
   calculateOverallScore(scores) {
@@ -264,20 +280,21 @@ export class DocuMintAPI {
     else if (avg >= 75) status = 'STRONG';
     else if (avg >= 50) status = 'MODERATE';
 
-    return { score: avg, status };
+    return { score: Math.round(avg * 10) / 10, status };
   }
 
   getChittyProofComparison(scores) {
-    // Compare to ChittyProof standard (90+ on all pillars)
     const weakPillars = Object.entries(scores)
       .filter(([_, v]) => v.score < 80)
       .map(([k]) => k);
 
+    const yourScore = this.calculateOverallScore(scores).score;
+
     return {
       chittyProofScore: 92,
-      yourScore: this.calculateOverallScore(scores).score,
+      yourScore,
       weakPillars,
-      improvementPotential: 92 - this.calculateOverallScore(scores).score
+      improvementPotential: Math.round((92 - yourScore) * 10) / 10
     };
   }
 
@@ -289,12 +306,12 @@ export class DocuMintAPI {
         score: 92,
         status: 'IRONCLAD',
         features: [
-          'Cryptographic signatures (P-256)',
+          'Cryptographic signatures (ECDSA-P256)',
           'ChittyID verified identity',
           'Immutable ChittyChain anchoring',
-          'Third-party attestation',
-          'Public verification',
-          'Legal defense backing'
+          'Third-party attestation (ChittyOS witness)',
+          'Public verification (no auth needed)',
+          'ChittyDLVR legal defense backing'
         ]
       },
       switchRecommendation: score.overall.score < 80
@@ -310,31 +327,62 @@ export class DocuMintAPI {
     }
 
     const token = authHeader.substring(7);
-    // TODO: Validate with ChittyOS
-    if (token.length > 10) {
-      return { valid: true, chittyId: 'authenticated' };
+    if (!token) return { valid: false };
+
+    // Validate against the real API key from environment
+    const validKey = this.env.API_KEY;
+    if (!validKey) {
+      console.error('API_KEY not configured in environment');
+      return { valid: false };
     }
 
-    return { valid: false };
+    // Constant-time comparison to prevent timing attacks
+    if (token.length !== validKey.length) return { valid: false };
+    const encoder = new TextEncoder();
+    const a = encoder.encode(token);
+    const b = encoder.encode(validKey);
+    let mismatch = 0;
+    for (let i = 0; i < a.length; i++) {
+      mismatch |= a[i] ^ b[i];
+    }
+    if (mismatch !== 0) return { valid: false };
+
+    return { valid: true, chittyId: this.env.CHITTY_ID || 'authenticated' };
   }
 
-  jsonResponse(data, status = 200) {
+  async parseJSON(request) {
+    try {
+      const data = await request.json();
+      return { data };
+    } catch {
+      return { error: this.errorResponse('Invalid JSON in request body', 400) };
+    }
+  }
+
+  getCorsOrigin(request) {
+    const origin = request?.headers?.get('Origin');
+    if (origin && ALLOWED_ORIGINS.includes(origin)) return origin;
+    return ALLOWED_ORIGINS[0];
+  }
+
+  jsonResponse(data, status = 200, request = null) {
     return new Response(JSON.stringify(data, null, 2), {
       status,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': this.getCorsOrigin(request)
       }
     });
   }
 
-  corsResponse() {
+  corsResponse(request) {
     return new Response(null, {
-      status: 200,
+      status: 204,
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Origin': this.getCorsOrigin(request),
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400'
       }
     });
   }

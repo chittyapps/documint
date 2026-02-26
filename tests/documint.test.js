@@ -9,12 +9,12 @@ describe('DocuMint', () => {
   let mint;
 
   beforeEach(() => {
-    mint = new DocuMint({ apiKey: 'test-key', chittyId: 'test-chitty-id' });
+    mint = new DocuMint({ apiKey: 'test-key-minimum-16ch', chittyId: 'test-chitty-id' });
   });
 
   describe('constructor', () => {
     it('initializes with config', () => {
-      expect(mint.apiKey).toBe('test-key');
+      expect(mint.apiKey).toBe('test-key-minimum-16ch');
       expect(mint.chittyId).toBe('test-chitty-id');
       expect(mint.initialized).toBe(false);
     });
