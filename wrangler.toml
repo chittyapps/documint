@@ -1,4 +1,4 @@
-name = "documint"
+name = "chittydocumint"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -40,7 +40,7 @@ VERSION = "1.0.0"
 
 # Staging
 [env.staging]
-name = "documint-staging"
+name = "chittydocumint-staging"
 routes = [
   { pattern = "documint-staging.chitty.cc/*", zone_name = "chitty.cc" }
 ]
@@ -49,6 +49,6 @@ ENVIRONMENT = "staging"
 
 # Development
 [env.dev]
-name = "documint-dev"
+name = "chittydocumint-dev"
 [env.dev.vars]
 ENVIRONMENT = "development"
