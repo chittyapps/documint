@@ -2,6 +2,7 @@ name = "documint"
 main = "src/worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+account_id = "0bc21e3a5a9de1a4cc843be9c3e98121"
 
 # Routes
 routes = [
@@ -11,8 +12,8 @@ routes = [
 
 # KV Namespaces
 kv_namespaces = [
-  { binding = "DOCUMINT_CACHE", id = "documint-cache" },
-  { binding = "PROOFS", id = "documint-proofs" }
+  { binding = "DOCUMINT_CACHE", id = "7809a9bc99ef43cc9ecc05f296c7bc08" },
+  { binding = "PROOFS", id = "b7ee5b57ca224279827cc761e6b7146a" }
 ]
 
 # Durable Objects
@@ -22,8 +23,9 @@ bindings = [
 ]
 
 [[migrations]]
-tag = "v1"
+tag = "v2"
 new_classes = ["ProofStateDO"]
+deleted_classes = ["BatchAccumulator"]
 
 # Environment Variables
 [vars]

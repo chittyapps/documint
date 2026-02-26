@@ -6,6 +6,13 @@
 import { DocuMintAPI } from './api/endpoints.js';
 
 export default {
+  async queue(batch, env) {
+    for (const message of batch.messages) {
+      console.log(`DocuMint queue event: ${JSON.stringify(message.body)}`);
+      message.ack();
+    }
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
