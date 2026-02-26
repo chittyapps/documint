@@ -4,7 +4,11 @@
  *
  * Uses in-memory event log with cryptographic hashing.
  * Each anchor is hash-chained to the previous, forming a tamper-evident log.
+ * Anchors to Cloudflare's drand beacon for publicly verifiable timestamps.
  */
+
+const DRAND_URL = 'https://drand.cloudflare.com';
+const DRAND_CHAIN_HASH = '8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce';
 
 export class ChittyChain {
   constructor(documint) {
@@ -17,22 +21,47 @@ export class ChittyChain {
   }
 
   /**
+   * Fetch latest drand round from Cloudflare's beacon
+   */
+  async fetchDrandRound() {
+    try {
+      const response = await fetch(`${DRAND_URL}/${DRAND_CHAIN_HASH}/public/latest`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return {
+        round: data.round,
+        randomness: data.randomness,
+        signature: data.signature
+      };
+    } catch {
+      // drand is supplementary — anchor still valid without it
+      return null;
+    }
+  }
+
+  /**
    * Anchor an event to ChittyChain
    */
   async anchor(event) {
     const anchorId = this.generateAnchorId();
     const timestamp = event.timestamp || new Date().toISOString();
 
+    // Fetch drand round for public temporal anchoring
+    const drand = await this.fetchDrandRound();
+
     // Hash the event with recursive canonicalization
     const eventHash = await this.hashEvent(event);
 
     // Chain to previous anchor (hash-linked list)
+    // Include drand randomness in the chain hash for public verifiability
     const previousHash = this._lastAnchorHash;
     const chainHash = await this.hashEvent({
       eventHash,
       previousHash: previousHash || 'GENESIS',
       anchorId,
-      timestamp
+      timestamp,
+      drandRound: drand?.round || null,
+      drandRandomness: drand?.randomness || null
     });
 
     const anchor = {
@@ -54,6 +83,15 @@ export class ChittyChain {
       // Chain linkage
       previousHash: previousHash || 'GENESIS',
       chainHash,
+
+      // drand temporal anchor
+      drand: drand ? {
+        round: drand.round,
+        randomness: drand.randomness,
+        signature: drand.signature,
+        beacon: DRAND_URL,
+        chainHash: DRAND_CHAIN_HASH
+      } : null,
 
       // Block confirmation (sequential block height)
       blockHeight: this._anchors.size + 1,
@@ -93,15 +131,23 @@ export class ChittyChain {
       };
     }
 
-    // Re-compute the event hash and verify it matches
+    // Re-compute the chain hash and verify it matches
     const recomputedHash = await this.hashEvent({
       eventHash: anchor.eventHash,
       previousHash: anchor.previousHash,
       anchorId: anchor.anchorId,
-      timestamp: anchor.anchoredAt
+      timestamp: anchor.anchoredAt,
+      drandRound: anchor.drand?.round || null,
+      drandRandomness: anchor.drand?.randomness || null
     });
 
     const valid = recomputedHash === anchor.chainHash;
+
+    // Optionally verify drand round against public beacon
+    let drandVerified = null;
+    if (anchor.drand) {
+      drandVerified = await this.verifyDrandRound(anchor.drand.round, anchor.drand.randomness);
+    }
 
     return {
       anchorId,
@@ -109,8 +155,26 @@ export class ChittyChain {
       verified: valid,
       tampered: !valid,
       blockHeight: anchor.blockHeight,
+      drand: drandVerified !== null ? {
+        verified: drandVerified,
+        round: anchor.drand.round
+      } : null,
       verifiedAt: new Date().toISOString()
     };
+  }
+
+  /**
+   * Verify a drand round against the public beacon
+   */
+  async verifyDrandRound(round, expectedRandomness) {
+    try {
+      const response = await fetch(`${DRAND_URL}/${DRAND_CHAIN_HASH}/public/${round}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.randomness === expectedRandomness;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -122,7 +186,6 @@ export class ChittyChain {
     // Verify chain integrity
     let gaps = 0;
     for (let i = 1; i < events.length; i++) {
-      // Each event should reference the previous chain hash
       if (events[i].previousHash !== events[i - 1].chainHash) {
         gaps++;
       }
@@ -136,7 +199,8 @@ export class ChittyChain {
         actor: a.event.actor,
         timestamp: a.event.timestamp,
         blockHeight: a.blockHeight,
-        eventHash: a.eventHash
+        eventHash: a.eventHash,
+        drandRound: a.drand?.round || null
       })),
       complete: events.length > 0,
       gaps,

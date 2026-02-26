@@ -110,6 +110,18 @@ describe('DocuMint', () => {
       expect(result.chain.event.action).toBe('MINTED');
     });
 
+    it('includes drand temporal anchor when available', async () => {
+      const doc = new TextEncoder().encode('content');
+      const result = await mint.mint({ document: doc, name: 'test.pdf' });
+
+      // drand may or may not be reachable in test env
+      if (result.chain.drand) {
+        expect(result.chain.drand.round).toBeGreaterThan(0);
+        expect(result.chain.drand.randomness).toBeDefined();
+        expect(result.chain.drand.beacon).toBe('https://drand.cloudflare.com');
+      }
+    });
+
     it('includes metadata with mintedBy', async () => {
       const doc = new TextEncoder().encode('content');
       const result = await mint.mint({
