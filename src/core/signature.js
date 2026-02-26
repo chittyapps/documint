@@ -14,17 +14,52 @@ export class ChittySignature {
   }
 
   /**
-   * Generate or retrieve the service signing key pair.
-   * In production, this would be loaded from KV or Durable Objects.
-   * The key pair is deterministic per instance lifecycle.
+   * Get or import the service signing key pair.
+   * If SIGNING_KEY_JWK is configured, imports persistent key.
+   * Otherwise generates ephemeral key with a warning.
    */
   async getServiceKeyPair() {
-    if (!this._serviceKeyPair) {
+    if (this._serviceKeyPair) return this._serviceKeyPair;
+
+    // Try to load persistent key from config
+    const jwk = this.documint?.signingKeyJwk;
+    if (jwk) {
+      try {
+        const keyData = typeof jwk === 'string' ? JSON.parse(jwk) : jwk;
+        const privateKey = await crypto.subtle.importKey(
+          'jwk', keyData,
+          { name: 'ECDSA', namedCurve: 'P-256' },
+          true,
+          ['sign']
+        );
+        // Derive public key from private JWK (remove 'd' parameter)
+        const publicJwk = { ...keyData };
+        delete publicJwk.d;
+        const publicKey = await crypto.subtle.importKey(
+          'jwk', publicJwk,
+          { name: 'ECDSA', namedCurve: 'P-256' },
+          true,
+          ['verify']
+        );
+        this._serviceKeyPair = { privateKey, publicKey };
+        return this._serviceKeyPair;
+      } catch (error) {
+        console.error('CRITICAL: Failed to import signing key from SIGNING_KEY_JWK:', error.message);
+        throw new Error(`Signing key import failed: ${error.message}. Check SIGNING_KEY_JWK configuration.`);
+      }
+    }
+
+    // Fall back to ephemeral key — signatures won't survive restart
+    console.warn('WARNING: Using ephemeral signing key. Set SIGNING_KEY_JWK for persistent signatures.');
+    try {
       this._serviceKeyPair = await crypto.subtle.generateKey(
         { name: 'ECDSA', namedCurve: 'P-256' },
         true,
         ['sign', 'verify']
       );
+    } catch (error) {
+      console.error('CRITICAL: ECDSA key generation failed:', error.message);
+      throw new Error(`Cryptographic key generation failed: ${error.message}. Document signing is unavailable.`);
     }
     return this._serviceKeyPair;
   }
@@ -37,8 +72,8 @@ export class ChittySignature {
 
     const signatureId = this.generateSignatureId();
 
-    // Build the data to sign: mintId + signer + role + timestamp
-    const signable = `${mintId}:${signer}:${role}:${timestamp}`;
+    // Build the data to sign: signatureId + mintId + signer + role + timestamp
+    const signable = `${signatureId}:${mintId}:${signer}:${role}:${timestamp}`;
 
     // Sign with real ECDSA-P256
     const { signature: rawSignature, publicKey } = await this.sign(signable);
@@ -154,11 +189,20 @@ export class ChittySignature {
     // Export public key in SPKI format
     const publicKeyBuffer = await crypto.subtle.exportKey('spki', keyPair.publicKey);
 
-    // Base64 encode both
-    const signature = btoa(String.fromCharCode(...new Uint8Array(signatureBuffer)));
-    const publicKey = btoa(String.fromCharCode(...new Uint8Array(publicKeyBuffer)));
+    // Base64 encode both (loop-based for safety with large buffers)
+    const signature = this.bufferToBase64(signatureBuffer);
+    const publicKey = this.bufferToBase64(publicKeyBuffer);
 
     return { signature, publicKey };
+  }
+
+  bufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
   generateSignatureId() {

@@ -15,9 +15,11 @@ const ALLOWED_ORIGINS = [
 export class DocuMintAPI {
   constructor(env) {
     this.env = env;
+    this._currentRequest = null;
     this.documint = new DocuMint({
       apiKey: env.INTERNAL_API_KEY,
-      chittyId: env.CHITTY_ID
+      chittyId: env.CHITTY_ID,
+      signingKeyJwk: env.SIGNING_KEY_JWK
     });
   }
 
@@ -27,6 +29,7 @@ export class DocuMintAPI {
   }
 
   async handleRequest(request) {
+    this._currentRequest = request;
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
@@ -163,6 +166,7 @@ export class DocuMintAPI {
     if (!proofIdMatch) return this.notFound();
 
     const proofId = proofIdMatch[1];
+    if (!/^(DM-|CPF-)/.test(proofId)) return this.errorResponse('Invalid proof ID format', 400);
     const result = await this.documint.verify(proofId);
 
     return this.jsonResponse({
@@ -336,14 +340,14 @@ export class DocuMintAPI {
       return { valid: false };
     }
 
-    // Constant-time comparison to prevent timing attacks
-    if (token.length !== validKey.length) return { valid: false };
+    // Constant-time comparison: hash both to fixed-length then XOR
+    // Hashing ensures comparison time is independent of key length
     const encoder = new TextEncoder();
-    const a = encoder.encode(token);
-    const b = encoder.encode(validKey);
+    const tokenHash = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(token)));
+    const keyHash = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(validKey)));
     let mismatch = 0;
-    for (let i = 0; i < a.length; i++) {
-      mismatch |= a[i] ^ b[i];
+    for (let i = 0; i < tokenHash.length; i++) {
+      mismatch |= tokenHash[i] ^ keyHash[i];
     }
     if (mismatch !== 0) return { valid: false };
 
@@ -388,19 +392,19 @@ export class DocuMintAPI {
   }
 
   notFound() {
-    return this.jsonResponse({ error: 'Not found' }, 404);
+    return this.jsonResponse({ error: 'Not found' }, 404, this._currentRequest);
   }
 
   unauthorized() {
-    return this.jsonResponse({ error: 'Unauthorized' }, 401);
+    return this.jsonResponse({ error: 'Unauthorized' }, 401, this._currentRequest);
   }
 
   methodNotAllowed() {
-    return this.jsonResponse({ error: 'Method not allowed' }, 405);
+    return this.jsonResponse({ error: 'Method not allowed' }, 405, this._currentRequest);
   }
 
   errorResponse(message, status = 500) {
-    return this.jsonResponse({ error: message }, status);
+    return this.jsonResponse({ error: message }, status, this._currentRequest);
   }
 }
 

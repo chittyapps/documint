@@ -24,7 +24,7 @@ export class DocuMintClient {
     this.timeout = config.timeout || 30000;
 
     if (!this.apiKey) {
-      throw new DocuMintError('API key required', 'AUTH_REQUIRED');
+      throw new DocuMintError('API key required', 'AUTH_REQUIRED', 401);
     }
   }
 
@@ -75,10 +75,11 @@ export class DocuMintClient {
    * Revoke a document (audit trail preserved)
    */
   async revoke(mintId, options) {
-    const { reason } = options;
+    const { reason, revokedBy } = options;
 
     return this.request('POST', `/mint/${mintId}/revoke`, {
-      reason
+      reason,
+      revokedBy
     });
   }
 
@@ -169,14 +170,14 @@ export class DocuMintClient {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: response.statusText }));
-        throw new DocuMintError(error.message || 'Request failed', response.status);
+        throw new DocuMintError(error.message || 'Request failed', error.code || 'REQUEST_FAILED', response.status);
       }
 
       return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        throw new DocuMintError('Request timeout', 408);
+        throw new DocuMintError('Request timeout', 'TIMEOUT', 408);
       }
       throw error;
     }
@@ -202,9 +203,10 @@ export class DocuMintClient {
 }
 
 export class DocuMintError extends Error {
-  constructor(message, status) {
+  constructor(message, code, status) {
     super(message);
     this.name = 'DocuMintError';
+    this.code = code;
     this.status = status;
   }
 }

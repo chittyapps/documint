@@ -223,6 +223,65 @@ describe('DocuMint', () => {
     });
   });
 
+  describe('sign→verify round-trip', () => {
+    let mintedDoc;
+
+    beforeEach(async () => {
+      await mint.initialize();
+      const doc = new TextEncoder().encode('contract to verify');
+      mintedDoc = await mint.mint({ document: doc, name: 'contract.pdf' });
+    });
+
+    it('signature created by sign() verifies successfully', async () => {
+      const sig = await mint.sign(mintedDoc.mintId, {
+        signer: 'signer-id',
+        role: 'signer'
+      });
+
+      // Verify the signature using the embedded public key and payload
+      const result = await mint.signature.verify(sig);
+      expect(result.valid).toBe(true);
+      expect(result.signatureId).toBe(sig.signatureId);
+    });
+
+    it('verification fails with tampered payload', async () => {
+      const sig = await mint.sign(mintedDoc.mintId, {
+        signer: 'signer-id',
+        role: 'signer'
+      });
+
+      // Tamper with the signed payload
+      const tampered = { ...sig, signedPayload: sig.signedPayload + ':tampered' };
+      const result = await mint.signature.verify(tampered);
+      expect(result.valid).toBe(false);
+    });
+
+    it('verification fails with missing signature data', async () => {
+      const result = await mint.signature.verify({
+        signatureId: 'SIG-FAKE',
+        signature: null,
+        publicKey: null,
+        signedPayload: null
+      });
+      expect(result.valid).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('chain anchor verifies after minting', async () => {
+      // The mint already created a chain anchor
+      const history = await mint.chain.history(mintedDoc.mintId);
+      expect(history.events.length).toBeGreaterThan(0);
+      expect(history.gaps).toBe(0);
+
+      // Verify the first anchor
+      const anchorId = history.events[0].anchorId;
+      const verification = await mint.chain.verify(anchorId);
+      expect(verification.exists).toBe(true);
+      expect(verification.verified).toBe(true);
+      expect(verification.tampered).toBe(false);
+    });
+  });
+
   describe('hashDocument', () => {
     it('throws on invalid input', async () => {
       await expect(mint.hashDocument(12345)).rejects.toThrow();

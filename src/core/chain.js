@@ -26,15 +26,23 @@ export class ChittyChain {
   async fetchDrandRound() {
     try {
       const response = await fetch(`${DRAND_URL}/${DRAND_CHAIN_HASH}/public/latest`);
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.error(`drand fetch failed: HTTP ${response.status} ${response.statusText}`);
+        return null;
+      }
       const data = await response.json();
+      if (!data.round || !data.randomness || !data.signature) {
+        console.error('drand returned incomplete data:', JSON.stringify(data));
+        return null;
+      }
       return {
         round: data.round,
         randomness: data.randomness,
         signature: data.signature
       };
-    } catch {
+    } catch (error) {
       // drand is supplementary — anchor still valid without it
+      console.error('drand fetch error (anchor proceeds without temporal proof):', error.message);
       return null;
     }
   }
@@ -169,10 +177,14 @@ export class ChittyChain {
   async verifyDrandRound(round, expectedRandomness) {
     try {
       const response = await fetch(`${DRAND_URL}/${DRAND_CHAIN_HASH}/public/${round}`);
-      if (!response.ok) return null;
+      if (!response.ok) {
+        console.error(`drand verification fetch failed for round ${round}: HTTP ${response.status}`);
+        return null;
+      }
       const data = await response.json();
       return data.randomness === expectedRandomness;
-    } catch {
+    } catch (error) {
+      console.error(`drand verification error for round ${round}:`, error.message);
       return null;
     }
   }
@@ -183,12 +195,21 @@ export class ChittyChain {
   async history(mintId) {
     const events = this._events.get(mintId) || [];
 
-    // Verify chain integrity
+    // Verify chain integrity: each anchor's previousHash must exist in the global chain
+    // Note: anchors from different mints are interleaved in the global chain,
+    // so we verify each anchor's previousHash points to a valid global predecessor
     let gaps = 0;
-    for (let i = 1; i < events.length; i++) {
-      if (events[i].previousHash !== events[i - 1].chainHash) {
-        gaps++;
+    for (const anchor of events) {
+      if (anchor.previousHash === 'GENESIS') continue;
+      // Find the anchor whose chainHash matches this anchor's previousHash
+      let found = false;
+      for (const [, a] of this._anchors) {
+        if (a.chainHash === anchor.previousHash) {
+          found = true;
+          break;
+        }
       }
+      if (!found) gaps++;
     }
 
     return {

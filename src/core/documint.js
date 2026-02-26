@@ -14,6 +14,7 @@ export class DocuMint {
     this.apiKey = config.apiKey || null;
     this.baseUrl = config.baseUrl || 'https://api.chitty.cc/documint/v1';
     this.chittyId = config.chittyId || null;
+    this.signingKeyJwk = config.signingKeyJwk || null;
 
     // Core components
     this.proof = new ChittyProof(this);

@@ -61,7 +61,19 @@ export class ProofStateDO {
     try {
       // Validate internal origin — only accept requests from our own workers
       const serviceToken = request.headers.get('X-Service-Token');
-      if (!serviceToken || serviceToken !== this.env.INTERNAL_SERVICE_TOKEN) {
+      const expectedToken = this.env.INTERNAL_SERVICE_TOKEN;
+      if (!serviceToken || !expectedToken) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      // Constant-time comparison via hash
+      const encoder = new TextEncoder();
+      const tokenHash = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(serviceToken)));
+      const expectedHash = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(expectedToken)));
+      let tokenMismatch = 0;
+      for (let i = 0; i < tokenHash.length; i++) {
+        tokenMismatch |= tokenHash[i] ^ expectedHash[i];
+      }
+      if (tokenMismatch !== 0) {
         return Response.json({ error: 'Forbidden' }, { status: 403 });
       }
 
