@@ -26,9 +26,21 @@ export default {
       if (url.pathname === '/health') {
         return Response.json({
           service: 'DocuMint',
-          status: 'healthy',
+          status: 'ok',
           version: env.VERSION || '1.0.0',
           timestamp: new Date().toISOString()
+        });
+      }
+
+      // Service status metadata
+      if (url.pathname === '/api/v1/status') {
+        return Response.json({
+          name: 'DocuMint',
+          version: env.VERSION || '1.0.0',
+          environment: env.ENVIRONMENT || 'production',
+          description: 'Document signing with ChittyProof 11-pillar standard',
+          uri: 'chittycanon://core/services/documint',
+          tier: 4
         });
       }
 

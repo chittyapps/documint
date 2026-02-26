@@ -334,9 +334,9 @@ export class DocuMintAPI {
     if (!token) return { valid: false };
 
     // Validate against the real API key from environment
-    const validKey = this.env.API_KEY;
+    const validKey = this.env.CHITTY_AUTH_SERVICE_TOKEN;
     if (!validKey) {
-      console.error('API_KEY not configured in environment');
+      console.error('CHITTY_AUTH_SERVICE_TOKEN not configured in environment');
       return { valid: false };
     }
 
