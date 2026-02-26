@@ -8,6 +8,12 @@ registered_with: chittycanon://core/services/canon
 title: "DocuMint Charter"
 certifier: chittycanon://core/services/chittycertify
 visibility: PUBLIC
+author: "ChittyApps"
+created: 2026-02-25T00:00:00Z
+modified: 2026-02-26T00:00:00Z
+certified: 2026-02-25T00:00:00Z
+tags: [documint, document-signing, chittyproof, tier-4, domain]
+category: domain-services
 ---
 
 # DocuMint Charter
@@ -56,10 +62,10 @@ Document signing service with ChittyProof integration. Implements the 11-pillar 
 | `/health` | GET | No | Health check |
 | `/api/v1/status` | GET | No | Service metadata |
 | `/documint/v1/mint` | POST | Yes | Mint a document |
-| `/documint/v1/sign/:mintId` | POST | Yes | Sign a document |
-| `/documint/v1/attach/:mintId` | POST | Yes | Attach document |
-| `/documint/v1/revoke/:mintId` | POST | Yes | Revoke document |
-| `/documint/v1/proof/:mintId` | GET | Yes | Get proof |
+| `/documint/v1/mint/:mintId/sign` | POST | Yes | Sign a document |
+| `/documint/v1/mint/:mintId/attach` | POST | Yes | Attach document |
+| `/documint/v1/mint/:mintId/revoke` | POST | Yes | Revoke document |
+| `/documint/v1/mint/:mintId` | GET | Yes | Get proof/verify |
 | `/verify/:proofId` | GET | No | Public verification |
 
 ## Ownership
@@ -73,7 +79,7 @@ Document signing service with ChittyProof integration. Implements the 11-pillar 
 
 - [ ] Service registered in ChittyRegistry
 - [x] Health endpoint operational at /health
-- [ ] CLAUDE.md development guide present
+- [x] CLAUDE.md development guide present
 - [x] CHARTER.md present
 - [x] CHITTY.md present
 

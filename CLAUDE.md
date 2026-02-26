@@ -1,3 +1,14 @@
+---
+uri: chittycanon://docs/tech/spec/documint-dev-guide
+namespace: chittycanon://docs/tech
+type: spec
+version: 1.0.0
+status: CERTIFIED
+registered_with: chittycanon://core/services/canon
+title: "DocuMint Development Guide"
+visibility: PUBLIC
+---
+
 # DocuMint
 
 Document signing service with ChittyProof 11-pillar standard. Cloudflare Worker at `documint.chitty.cc`.

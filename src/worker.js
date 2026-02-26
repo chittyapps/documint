@@ -1,6 +1,7 @@
 /**
  * DocuMint Worker
  * Cloudflare Worker entry point
+ * @canon chittycanon://core/services/documint
  */
 
 import { DocuMintAPI } from './api/endpoints.js';

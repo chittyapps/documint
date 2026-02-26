@@ -3,6 +3,7 @@
  * "Mint it. It's permanent."
  *
  * Document minting with ChittyProof - the 11-pillar proof standard.
+ * @canon chittycanon://core/services/documint
  */
 
 import { ChittyProof } from './proof.js';

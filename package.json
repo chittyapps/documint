@@ -1,6 +1,7 @@
 {
   "name": "@chitty/documint",
   "version": "1.0.0",
+  "type": "module",
   "description": "Mint it. It's permanent. Document signing with ChittyProof.",
   "main": "src/index.js",
   "module": "src/index.js",
