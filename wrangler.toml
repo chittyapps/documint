@@ -29,9 +29,8 @@ bindings = [
 ]
 
 [[migrations]]
-tag = "v2"
+tag = "v1"
 new_classes = ["ProofStateDO"]
-deleted_classes = ["BatchAccumulator"]
 
 # Environment Variables
 [vars]
