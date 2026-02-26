@@ -1,4 +1,4 @@
-name = "chittydocumint"
+name = "documint"
 main = "src/worker.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -32,6 +32,10 @@ bindings = [
 tag = "v1"
 new_classes = ["ProofStateDO"]
 
+[[migrations]]
+tag = "v2"
+deleted_classes = ["BatchAccumulator"]
+
 # Environment Variables
 [vars]
 ENVIRONMENT = "production"
@@ -39,7 +43,7 @@ VERSION = "1.0.0"
 
 # Staging
 [env.staging]
-name = "chittydocumint-staging"
+name = "documint-staging"
 routes = [
   { pattern = "documint-staging.chitty.cc/*", zone_name = "chitty.cc" }
 ]
@@ -48,6 +52,6 @@ ENVIRONMENT = "staging"
 
 # Development
 [env.dev]
-name = "chittydocumint-dev"
+name = "documint-dev"
 [env.dev.vars]
 ENVIRONMENT = "development"

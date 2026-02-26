@@ -62,8 +62,8 @@ Cloudflare Worker deployed at documint.chitty.cc with Durable Objects for proof 
 | `/health` | GET | No | Health check |
 | `/api/v1/status` | GET | No | Service metadata |
 | `/documint/v1/mint` | POST | Yes | Mint document |
-| `/documint/v1/sign/:mintId` | POST | Yes | Sign document |
-| `/documint/v1/attach/:mintId` | POST | Yes | Attach document |
-| `/documint/v1/revoke/:mintId` | POST | Yes | Revoke document |
-| `/documint/v1/proof/:mintId` | GET | Yes | Get proof |
+| `/documint/v1/mint/:mintId/sign` | POST | Yes | Sign document |
+| `/documint/v1/mint/:mintId/attach` | POST | Yes | Attach document |
+| `/documint/v1/mint/:mintId/revoke` | POST | Yes | Revoke document |
+| `/documint/v1/mint/:mintId` | GET | Yes | Get proof/verify |
 | `/verify/:proofId` | GET | No | Public verification |
