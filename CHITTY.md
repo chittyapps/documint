@@ -3,7 +3,7 @@ uri: chittycanon://docs/ops/architecture/documint
 namespace: chittycanon://docs/ops
 type: architecture
 version: 1.0.0
-status: PENDING
+status: CERTIFIED
 registered_with: chittycanon://core/services/canon
 title: "DocuMint"
 certifier: chittycanon://core/services/cert
@@ -47,9 +47,11 @@ Cloudflare Worker deployed at documint.chitty.cc with Durable Objects for proof 
 ## ChittyOS Ecosystem
 
 ### Certification
-- **Badge**: Pending
+- **Badge**: ChittyCertified
 - **Certifier**: ChittyCert (`chittycanon://core/services/cert`)
-- **Last Certified**: N/A — awaiting registration pipeline completion
+- **ChittyID**: `did:chitty:REG-XE6AMW`
+- **Certificate**: `CERT-MOCK-1771743231327` (expires 2027-02-22)
+- **Last Certified**: 2026-02-22
 
 ### ChittyDNA
 - **Lineage**: root (original service)
