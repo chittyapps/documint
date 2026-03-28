@@ -3,7 +3,7 @@ uri: chittycanon://docs/ops/policy/documint-charter
 namespace: chittycanon://docs/ops
 type: policy
 version: 1.0.0
-status: CERTIFIED
+status: PENDING
 registered_with: chittycanon://core/services/canon
 title: "DocuMint Charter"
 certifier: chittycanon://core/services/cert
@@ -77,7 +77,7 @@ Document signing service with ChittyProof integration. Implements the 11-pillar 
 
 ## Compliance
 
-- [x] Service registered in ChittyRegistry (did:chitty:REG-XE6AMW)
+- [x] Service registered in ChittyRegistry (03-1-USA-7766-T-2603-0-14)
 - [x] Health endpoint operational at /health
 - [x] CLAUDE.md development guide present
 - [x] CHARTER.md present
