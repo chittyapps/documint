@@ -2,21 +2,27 @@
  * ChittyChain - Immutable Ledger Integration
  * "Every moment. Every actor. Forever."
  *
- * Uses in-memory event log with cryptographic hashing.
- * Each anchor is hash-chained to the previous, forming a tamper-evident log.
- * Anchors to Cloudflare's drand beacon for publicly verifiable timestamps.
+ * Hash-chained event log with drand temporal anchoring.
+ * Persisted to Cloudflare KV (DOCUMINT_CACHE) for durability across worker invocations.
+ * @canon chittycanon://core/services/documint
  */
 
 const DRAND_URL = 'https://drand.cloudflare.com';
 const DRAND_CHAIN_HASH = '8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce';
 
+// KV key prefixes
+const KEY_ANCHOR = 'anchor:';
+const KEY_CHAIN = 'mint-chain:';
+const KEY_LAST_HASH = 'chain:last-hash';
+
 export class ChittyChain {
-  constructor(documint) {
+  constructor(documint, kv) {
     this.documint = documint;
     this.chainUrl = 'https://chain.chitty.cc';
-    // In-memory chain store (production: KV or Durable Objects)
+    this.kv = kv || null;
+    // In-memory fallback when KV is unavailable (dev/test only)
     this._anchors = new Map();
-    this._events = new Map(); // mintId -> [anchor, anchor, ...]
+    this._events = new Map();
     this._lastAnchorHash = null;
   }
 
@@ -48,6 +54,21 @@ export class ChittyChain {
   }
 
   /**
+   * Load the last anchor hash from KV for chain continuity
+   */
+  async loadLastHash() {
+    if (this._lastAnchorHash) return this._lastAnchorHash;
+    if (this.kv) {
+      try {
+        this._lastAnchorHash = await this.kv.get(KEY_LAST_HASH);
+      } catch (error) {
+        console.error('Failed to load last anchor hash from KV:', error.message);
+      }
+    }
+    return this._lastAnchorHash;
+  }
+
+  /**
    * Anchor an event to ChittyChain
    */
   async anchor(event) {
@@ -61,7 +82,7 @@ export class ChittyChain {
     const eventHash = await this.hashEvent(event);
 
     // Chain to previous anchor (hash-linked list)
-    // Include drand randomness in the chain hash for public verifiability
+    await this.loadLastHash();
     const previousHash = this._lastAnchorHash;
     const chainHash = await this.hashEvent({
       eventHash,
@@ -71,6 +92,15 @@ export class ChittyChain {
       drandRound: drand?.round || null,
       drandRandomness: drand?.randomness || null
     });
+
+    // Get current block height from KV or memory
+    let blockHeight = this._anchors.size + 1;
+    if (this.kv) {
+      try {
+        const meta = await this.kv.get('chain:meta', { type: 'json' });
+        blockHeight = (meta?.blockHeight || 0) + 1;
+      } catch { /* use fallback */ }
+    }
 
     const anchor = {
       anchorId,
@@ -102,7 +132,7 @@ export class ChittyChain {
       } : null,
 
       // Block confirmation (sequential block height)
-      blockHeight: this._anchors.size + 1,
+      blockHeight,
       txId: `TX-${anchorId}`,
       status: 'CONFIRMED',
 
@@ -111,15 +141,36 @@ export class ChittyChain {
       confirmedAt: new Date().toISOString()
     };
 
-    // Store the anchor
-    this._anchors.set(anchorId, anchor);
+    // Persist to KV if available, otherwise in-memory fallback
+    if (this.kv) {
+      try {
+        // Store anchor by ID
+        await this.kv.put(`${KEY_ANCHOR}${anchorId}`, JSON.stringify(anchor));
+
+        // Append to mint's chain index
+        const chainKey = `${KEY_CHAIN}${event.mintId}`;
+        const existing = await this.kv.get(chainKey, { type: 'json' }) || [];
+        existing.push(anchorId);
+        await this.kv.put(chainKey, JSON.stringify(existing));
+
+        // Update last hash and block height
+        await this.kv.put(KEY_LAST_HASH, chainHash);
+        await this.kv.put('chain:meta', JSON.stringify({ blockHeight, lastAnchorId: anchorId }));
+      } catch (error) {
+        console.error('KV persistence failed for anchor, falling back to memory:', error.message);
+        this._anchors.set(anchorId, anchor);
+        const mintEvents = this._events.get(event.mintId) || [];
+        mintEvents.push(anchor);
+        this._events.set(event.mintId, mintEvents);
+      }
+    } else {
+      this._anchors.set(anchorId, anchor);
+      const mintEvents = this._events.get(event.mintId) || [];
+      mintEvents.push(anchor);
+      this._events.set(event.mintId, mintEvents);
+    }
+
     this._lastAnchorHash = chainHash;
-
-    // Index by mintId
-    const mintEvents = this._events.get(event.mintId) || [];
-    mintEvents.push(anchor);
-    this._events.set(event.mintId, mintEvents);
-
     return anchor;
   }
 
@@ -127,7 +178,7 @@ export class ChittyChain {
    * Verify an anchor exists and its chain hash is valid
    */
   async verify(anchorId) {
-    const anchor = this._anchors.get(anchorId);
+    const anchor = await this.getAnchor(anchorId);
 
     if (!anchor) {
       return {
@@ -172,6 +223,21 @@ export class ChittyChain {
   }
 
   /**
+   * Get an anchor by ID from KV or memory
+   */
+  async getAnchor(anchorId) {
+    if (this.kv) {
+      try {
+        const data = await this.kv.get(`${KEY_ANCHOR}${anchorId}`, { type: 'json' });
+        if (data) return data;
+      } catch (error) {
+        console.error('KV read failed for anchor:', error.message);
+      }
+    }
+    return this._anchors.get(anchorId) || null;
+  }
+
+  /**
    * Verify a drand round against the public beacon
    */
   async verifyDrandRound(round, expectedRandomness) {
@@ -193,20 +259,49 @@ export class ChittyChain {
    * Get full chain history for a mintId
    */
   async history(mintId) {
-    const events = this._events.get(mintId) || [];
+    let events = [];
 
-    // Verify chain integrity: each anchor's previousHash must exist in the global chain
-    // Note: anchors from different mints are interleaved in the global chain,
-    // so we verify each anchor's previousHash points to a valid global predecessor
+    if (this.kv) {
+      try {
+        const anchorIds = await this.kv.get(`${KEY_CHAIN}${mintId}`, { type: 'json' }) || [];
+        for (const id of anchorIds) {
+          const anchor = await this.getAnchor(id);
+          if (anchor) events.push(anchor);
+        }
+      } catch (error) {
+        console.error('KV read failed for chain history:', error.message);
+      }
+    }
+
+    // Fall back to memory if KV returned nothing
+    if (events.length === 0) {
+      events = this._events.get(mintId) || [];
+    }
+
+    // Verify chain integrity
     let gaps = 0;
     for (const anchor of events) {
       if (anchor.previousHash === 'GENESIS') continue;
-      // Find the anchor whose chainHash matches this anchor's previousHash
       let found = false;
-      for (const [, a] of this._anchors) {
-        if (a.chainHash === anchor.previousHash) {
-          found = true;
-          break;
+      // Check KV for predecessor
+      if (this.kv) {
+        try {
+          const keys = await this.kv.list({ prefix: KEY_ANCHOR });
+          for (const key of keys.keys) {
+            const a = await this.kv.get(key.name, { type: 'json' });
+            if (a && a.chainHash === anchor.previousHash) {
+              found = true;
+              break;
+            }
+          }
+        } catch { /* fall through to memory check */ }
+      }
+      if (!found) {
+        for (const [, a] of this._anchors) {
+          if (a.chainHash === anchor.previousHash) {
+            found = true;
+            break;
+          }
         }
       }
       if (!found) gaps++;
