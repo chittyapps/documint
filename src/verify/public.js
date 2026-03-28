@@ -66,7 +66,7 @@ export class PublicVerify {
   static async verifySignature(signatureId) {
     let response;
     try {
-      response = await fetch(`${this.baseUrl}/sig/${encodeURIComponent(signatureId)}`);
+      response = await fetch(`${this.baseUrl}/${encodeURIComponent(signatureId)}`);
     } catch (error) {
       return { signatureId, valid: false, error: `Network error: ${error.message}` };
     }
