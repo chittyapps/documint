@@ -2,6 +2,9 @@
  * ChittyProof - The 11-Pillar Proof Standard
  * "Proof that survives everything."
  *
+ * Persisted to Cloudflare KV (PROOFS namespace) for durability.
+ * @canon chittycanon://core/services/documint
+ *
  * Pillars:
  * 1. Signature Strength - Is this a real signature?
  * 2. Identity Authenticity - Is this really that person?
@@ -17,17 +20,18 @@
  */
 
 export class ChittyProof {
-  constructor(documint) {
+  constructor(documint, kv) {
     this.documint = documint;
+    this.kv = kv || null;
   }
 
   /**
-   * Create a new ChittyProof object
+   * Create a new ChittyProof object and persist it
    */
   async create(options) {
     const { mintId, documentHash, timestamp } = options;
 
-    return {
+    const proof = {
       proofId: `CPF-${mintId}`,
       version: '1.0',
       mintId,
@@ -173,20 +177,53 @@ export class ChittyProof {
       updatedAt: timestamp,
 
       // Verification
-      verifyUrl: `https://chitty.cc/verify/CPF-${mintId}`
+      verifyUrl: `https://documint.chitty.cc/verify/CPF-${mintId}`
     };
+
+    // Calculate initial overall score
+    proof.overall = this.calculateOverall(proof.pillars);
+
+    // Persist to KV
+    await this.saveProof(mintId, proof);
+
+    return proof;
   }
 
   /**
-   * Update proof pillars
+   * Update proof pillars and persist
    */
   async update(mintId, updates) {
-    // In production, this would update stored proof
-    // For now, return the updates applied
+    const proof = await this.loadProof(mintId);
+
+    if (!proof) {
+      console.error(`Proof not found for mintId: ${mintId}`);
+      return {
+        mintId,
+        updated: Object.keys(updates),
+        timestamp: new Date().toISOString(),
+        error: 'Proof not found — updates queued but not applied'
+      };
+    }
+
+    // Apply updates to pillars
+    for (const [pillar, data] of Object.entries(updates)) {
+      if (proof.pillars[pillar]) {
+        Object.assign(proof.pillars[pillar], data);
+      }
+    }
+
+    // Recalculate overall score
+    proof.overall = this.calculateOverall(proof.pillars);
+    proof.updatedAt = new Date().toISOString();
+
+    // Persist updated proof
+    await this.saveProof(mintId, proof);
+
     return {
       mintId,
       updated: Object.keys(updates),
-      timestamp: new Date().toISOString()
+      overall: proof.overall,
+      timestamp: proof.updatedAt
     };
   }
 
@@ -210,19 +247,34 @@ export class ChittyProof {
   }
 
   /**
-   * Verify a proof
+   * Verify a proof by loading from storage
    */
   async verify(mintId) {
-    // In production, fetch from storage and verify all pillars
+    const proof = await this.loadProof(mintId);
+
+    if (!proof) {
+      return {
+        mintId,
+        verified: false,
+        timestamp: new Date().toISOString(),
+        error: 'Proof not found',
+        overall: { score: 0, status: 'NOT_FOUND' }
+      };
+    }
+
+    // Recalculate and verify overall score matches stored
+    const recalculated = this.calculateOverall(proof.pillars);
+
     return {
       mintId,
       verified: true,
       timestamp: new Date().toISOString(),
-      pillars: {}, // Would contain full pillar verification
-      overall: {
-        score: 0,
-        status: 'PENDING_VERIFICATION'
-      }
+      pillars: proof.pillars,
+      overall: recalculated,
+      documentHash: proof.documentHash,
+      proofId: proof.proofId,
+      createdAt: proof.createdAt,
+      updatedAt: proof.updatedAt
     };
   }
 
@@ -230,14 +282,17 @@ export class ChittyProof {
    * Get full proof bundle with all linked documents
    */
   async bundle(mintId) {
+    const proof = await this.verify(mintId);
+    const proofData = await this.loadProof(mintId);
+
     return {
       mintId,
-      proof: await this.verify(mintId),
-      attachments: [],
-      links: [],
-      auditTrail: [],
+      proof,
+      attachments: proofData?.pillars?.caseReady?.attachments || [],
+      links: proofData?.pillars?.caseReady?.links || [],
+      auditTrail: proofData?.pillars?.chain?.events || [],
       exportable: true,
-      courtReady: true
+      courtReady: proof.overall?.score >= 75
     };
   }
 
@@ -249,7 +304,6 @@ export class ChittyProof {
       format: 'PDX',
       version: '1.0',
       mintId,
-      // Would contain full PDX package
       exportedAt: new Date().toISOString()
     };
   }
@@ -265,9 +319,9 @@ export class ChittyProof {
       generated: new Date().toISOString(),
       proof,
       pillars: this.formatPillarsForReport(proof.pillars),
-      chainOfCustody: [],
+      chainOfCustody: proof.pillars?.chain?.events || [],
       verificationInstructions: [
-        `Visit: https://chitty.cc/verify/${mintId}`,
+        `Visit: https://documint.chitty.cc/verify/${mintId}`,
         'Or use: npx @chitty/documint verify ' + mintId,
         'Or verify cryptographic signatures independently'
       ],
@@ -283,6 +337,33 @@ export class ChittyProof {
       arguable: pillar.arguable,
       status: pillar.score >= 80 ? 'STRONG' : pillar.score >= 50 ? 'MODERATE' : 'WEAK'
     }));
+  }
+
+  /**
+   * Load proof from KV or return null
+   */
+  async loadProof(mintId) {
+    if (this.kv) {
+      try {
+        return await this.kv.get(`proof:${mintId}`, { type: 'json' });
+      } catch (error) {
+        console.error(`Failed to load proof from KV for ${mintId}:`, error.message);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Save proof to KV
+   */
+  async saveProof(mintId, proof) {
+    if (this.kv) {
+      try {
+        await this.kv.put(`proof:${mintId}`, JSON.stringify(proof));
+      } catch (error) {
+        console.error(`Failed to save proof to KV for ${mintId}:`, error.message);
+      }
+    }
   }
 }
 

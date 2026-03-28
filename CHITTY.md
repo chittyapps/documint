@@ -3,15 +3,14 @@ uri: chittycanon://docs/ops/architecture/documint
 namespace: chittycanon://docs/ops
 type: architecture
 version: 1.0.0
-status: CERTIFIED
+status: PENDING
 registered_with: chittycanon://core/services/canon
 title: "DocuMint"
-certifier: chittycanon://core/services/chittycertify
+certifier: chittycanon://core/services/cert
 visibility: PUBLIC
 author: "ChittyApps"
 created: 2026-02-25T00:00:00Z
 modified: 2026-02-26T00:00:00Z
-certified: 2026-02-25T00:00:00Z
 tags: [documint, document-signing, chittyproof, ecdsa-p256, tier-4, domain]
 category: domain-services
 ---
@@ -48,9 +47,9 @@ Cloudflare Worker deployed at documint.chitty.cc with Durable Objects for proof 
 ## ChittyOS Ecosystem
 
 ### Certification
-- **Badge**: ChittyCertified
-- **Certifier**: ChittyCertify (`chittycanon://core/services/chittycertify`)
-- **Last Certified**: 2026-02-25
+- **Badge**: Pending
+- **Certifier**: ChittyCert (`chittycanon://core/services/cert`)
+- **Last Certified**: N/A — awaiting registration pipeline completion
 
 ### ChittyDNA
 - **Lineage**: root (original service)
@@ -59,8 +58,9 @@ Cloudflare Worker deployed at documint.chitty.cc with Durable Objects for proof 
 ### Dependencies
 | Service | Purpose |
 |---------|---------|
-| ChittyAuth | Token validation |
-| drand.cloudflare.com | Temporal anchoring |
+| ChittyID | Signer identity |
+| ChittyAuth | Token provisioning (validated locally) |
+| drand.cloudflare.com | Temporal anchoring (failure-tolerant) |
 
 ### Endpoints
 | Path | Method | Auth | Purpose |

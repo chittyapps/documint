@@ -13,7 +13,7 @@ function escapeHtml(s) {
 }
 
 export class PublicVerify {
-  static baseUrl = 'https://api.chitty.cc/verify';
+  static baseUrl = 'https://documint.chitty.cc/verify';
 
   static async verify(proofId) {
     let response;
@@ -89,13 +89,13 @@ export class PublicVerify {
     const sizes = { small: { width: 120, height: 40 }, medium: { width: 200, height: 60 }, large: { width: 280, height: 80 } };
     const { width, height } = sizes[size] || sizes.medium;
 
-    return `<a href="https://chitty.cc/verify/${safeId}" target="_blank" rel="noopener"><img src="https://chitty.cc/badge/${safeId}?theme=${safeTheme}" alt="Verified by ChittyProof" width="${Number(width)}" height="${Number(height)}" /></a>`;
+    return `<a href="https://documint.chitty.cc/verify/${safeId}" target="_blank" rel="noopener"><img src="https://documint.chitty.cc/badge/${safeId}?theme=${safeTheme}" alt="Verified by ChittyProof" width="${Number(width)}" height="${Number(height)}" /></a>`;
   }
 
   static getQRCode(proofId, options = {}) {
     const { size = 200 } = options;
     const safeId = encodeURIComponent(proofId);
-    return `https://chitty.cc/qr/${safeId}?size=${Number(size)}`;
+    return `https://documint.chitty.cc/qr/${safeId}?size=${Number(size)}`;
   }
 
   static getEmbed(proofId, options = {}) {
@@ -104,7 +104,7 @@ export class PublicVerify {
     const safeWidth = escapeHtml(String(width));
     const safeHeight = Number(height);
 
-    return `<iframe src="https://chitty.cc/embed/verify/${safeId}" width="${safeWidth}" height="${safeHeight}" frameborder="0" allowtransparency="true"></iframe>`;
+    return `<iframe src="https://documint.chitty.cc/embed/verify/${safeId}" width="${safeWidth}" height="${safeHeight}" frameborder="0" allowtransparency="true"></iframe>`;
   }
 }
 

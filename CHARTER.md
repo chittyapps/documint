@@ -3,15 +3,14 @@ uri: chittycanon://docs/ops/policy/documint-charter
 namespace: chittycanon://docs/ops
 type: policy
 version: 1.0.0
-status: CERTIFIED
+status: PENDING
 registered_with: chittycanon://core/services/canon
 title: "DocuMint Charter"
-certifier: chittycanon://core/services/chittycertify
+certifier: chittycanon://core/services/cert
 visibility: PUBLIC
 author: "ChittyApps"
 created: 2026-02-25T00:00:00Z
 modified: 2026-02-26T00:00:00Z
-certified: 2026-02-25T00:00:00Z
 tags: [documint, document-signing, chittyproof, tier-4, domain]
 category: domain-services
 ---
@@ -48,9 +47,10 @@ Document signing service with ChittyProof integration. Implements the 11-pillar 
 
 | Type | Service | Purpose |
 |------|---------|---------|
-| Upstream | ChittyAuth | Authentication |
-| External | drand.cloudflare.com | Temporal anchoring |
-| Storage | Cloudflare KV | Proof cache |
+| Upstream | ChittyID | Signer identity |
+| Upstream | ChittyAuth | Token provisioning (validated locally) |
+| External | drand.cloudflare.com | Temporal anchoring (failure-tolerant) |
+| Storage | Cloudflare KV | Proof + chain persistence |
 | Storage | Cloudflare DO | Proof state |
 
 ## API Contract
@@ -77,7 +77,7 @@ Document signing service with ChittyProof integration. Implements the 11-pillar 
 
 ## Compliance
 
-- [x] Service registered in ChittyRegistry
+- [ ] Service registered in ChittyRegistry
 - [x] Health endpoint operational at /health
 - [x] CLAUDE.md development guide present
 - [x] CHARTER.md present

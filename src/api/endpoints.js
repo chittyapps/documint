@@ -1,6 +1,7 @@
 /**
  * DocuMint API Endpoints
  * Cloudflare Worker handlers for DocuMint API
+ * @canon chittycanon://core/services/documint
  */
 
 import { DocuMint } from '../core/documint.js';
@@ -9,7 +10,10 @@ const ALLOWED_ORIGINS = [
   'https://documint.chitty.cc',
   'https://api.chitty.cc',
   'https://portal.chitty.cc',
-  'https://chitty.cc'
+  'https://chitty.cc',
+  'http://localhost:8787',
+  'http://localhost:3000',
+  'http://127.0.0.1:8787'
 ];
 
 export class DocuMintAPI {
@@ -19,11 +23,17 @@ export class DocuMintAPI {
     this.documint = new DocuMint({
       apiKey: env.INTERNAL_API_KEY,
       chittyId: env.CHITTY_ID,
-      signingKeyJwk: env.SIGNING_KEY_JWK
+      signingKeyJwk: env.SIGNING_KEY_JWK,
+      proofsKv: env.PROOFS || null,
+      cacheKv: env.DOCUMINT_CACHE || null
     });
   }
 
   async initialize() {
+    // Assert SIGNING_KEY_JWK is present — ephemeral keys break cross-instance verification
+    if (!this.env.SIGNING_KEY_JWK) {
+      console.warn('CRITICAL: SIGNING_KEY_JWK not configured. Signatures will use ephemeral keys and cannot be verified across worker restarts.');
+    }
     await this.documint.initialize();
     return this;
   }
@@ -166,7 +176,7 @@ export class DocuMintAPI {
     if (!proofIdMatch) return this.notFound();
 
     const proofId = proofIdMatch[1];
-    if (!/^(DM-|CPF-)/.test(proofId)) return this.errorResponse('Invalid proof ID format', 400);
+    if (!/^(DM-|CPF-|SIG-)/.test(proofId)) return this.errorResponse('Invalid proof ID format', 400);
     const result = await this.documint.verify(proofId);
 
     return this.jsonResponse({

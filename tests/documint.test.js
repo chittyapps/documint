@@ -61,7 +61,7 @@ describe('DocuMint', () => {
       expect(result.document.name).toBe('Contract.pdf');
       expect(result.document.type).toBe('contract');
       expect(result.document.hash).toHaveLength(64); // SHA-256 hex
-      expect(result.verifyUrl).toContain('chitty.cc/verify/');
+      expect(result.verifyUrl).toContain('documint.chitty.cc/verify/');
     });
 
     it('mints a document from base64 string', async () => {

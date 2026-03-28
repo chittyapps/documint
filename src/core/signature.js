@@ -4,6 +4,7 @@
  *
  * Uses Web Crypto API (available in Cloudflare Workers) for
  * real ECDSA-P256-SHA256 signing and verification.
+ * @canon chittycanon://core/services/documint
  */
 
 export class ChittySignature {
@@ -107,7 +108,7 @@ export class ChittySignature {
 
       // Status
       status: 'VALID',
-      verifyUrl: `https://chitty.cc/sig/${signatureId}`
+      verifyUrl: `https://documint.chitty.cc/verify/${signatureId}`
     };
 
     return signature;

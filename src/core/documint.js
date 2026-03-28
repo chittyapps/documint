@@ -17,10 +17,14 @@ export class DocuMint {
     this.chittyId = config.chittyId || null;
     this.signingKeyJwk = config.signingKeyJwk || null;
 
-    // Core components
-    this.proof = new ChittyProof(this);
+    // KV bindings for persistence
+    const proofsKv = config.proofsKv || null;
+    const cacheKv = config.cacheKv || null;
+
+    // Core components with KV persistence
+    this.proof = new ChittyProof(this, proofsKv);
     this.signature = new ChittySignature(this);
-    this.chain = new ChittyChain(this);
+    this.chain = new ChittyChain(this, cacheKv);
 
     this.initialized = false;
   }
@@ -95,7 +99,7 @@ export class DocuMint {
       createdAt: timestamp,
 
       // Verification URL
-      verifyUrl: `https://chitty.cc/verify/${mintId}`,
+      verifyUrl: `https://documint.chitty.cc/verify/${mintId}`,
 
       // Metadata
       metadata: {

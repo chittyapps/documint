@@ -68,7 +68,7 @@ const doc = await mint.mint({
 
 // doc.mintId = 'DM-ABC123...'
 // doc.proof = ChittyProof object
-// doc.verifyUrl = 'https://chitty.cc/verify/DM-ABC123...'
+// doc.verifyUrl = 'https://documint.chitty.cc/verify/DM-ABC123...'
 ```
 
 ### Sign
@@ -96,7 +96,8 @@ await mint.attach(doc.mintId, {
 
 ```javascript
 await mint.revoke(doc.mintId, {
-  reason: 'Mutual termination'
+  reason: 'Mutual termination',
+  revokedBy: 'chittyid-123'
 });
 
 // Document is void
@@ -146,7 +147,7 @@ const result = await PublicVerify.verify('DM-ABC123');
 
 Or via URL:
 ```
-https://chitty.cc/verify/DM-ABC123
+https://documint.chitty.cc/verify/DM-ABC123
 ```
 
 Or CLI:
@@ -183,7 +184,7 @@ If we lose, we cover your legal costs.
 
 - Website: https://documint.chitty.cc
 - Docs: https://docs.chitty.cc/documint
-- Verify: https://chitty.cc/verify
+- Verify: https://documint.chitty.cc/verify
 - GitHub: https://github.com/chittyapps/documint
 
 ## License

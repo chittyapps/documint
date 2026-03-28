@@ -3,6 +3,7 @@
  * "Mint it. It's permanent."
  *
  * Document signing with ChittyProof - the 11-pillar proof standard.
+ * @canon chittycanon://core/services/documint
  *
  * @example
  * import { DocuMint } from '@chitty/documint';

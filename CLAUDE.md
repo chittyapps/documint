@@ -3,10 +3,16 @@ uri: chittycanon://docs/tech/spec/documint-dev-guide
 namespace: chittycanon://docs/tech
 type: spec
 version: 1.0.0
-status: CERTIFIED
+status: PENDING
 registered_with: chittycanon://core/services/canon
 title: "DocuMint Development Guide"
+certifier: chittycanon://core/services/cert
 visibility: PUBLIC
+author: "ChittyApps"
+created: 2026-02-25T00:00:00Z
+modified: 2026-03-27T00:00:00Z
+tags: [documint, document-signing, developer-guide, tier-4, domain]
+category: domain-services
 ---
 
 # DocuMint
