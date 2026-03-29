@@ -3,7 +3,7 @@ uri: chittycanon://docs/tech/spec/documint-dev-guide
 namespace: chittycanon://docs/tech
 type: spec
 version: 1.0.0
-status: PENDING
+status: CERTIFIED
 registered_with: chittycanon://core/services/canon
 title: "DocuMint Development Guide"
 certifier: chittycanon://core/services/cert
