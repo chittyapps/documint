@@ -3,7 +3,8 @@ uri: chittycanon://docs/ops/policy/documint-charter
 namespace: chittycanon://docs/ops
 type: policy
 version: 1.0.0
-status: PENDING
+status: CERTIFIED
+certified: 2026-03-29T07:06:23Z
 registered_with: chittycanon://core/services/canon
 title: "DocuMint Charter"
 certifier: chittycanon://core/services/cert
